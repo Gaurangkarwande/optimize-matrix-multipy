@@ -3,46 +3,46 @@
 #include <sys/time.h>
 #include <cblas.h>
 
-#define BLOCK_SIZE 33
+#define BLOCK_SIZE 64
 #define min(a,b) (((a)<(b))?(a):(b))
 
-void initialize_matrix(int row, int col, double (*mat)[col], int is_result)
+void initialize_matrix(int row, int col, double mat[], int is_result)
 {
     srand(0);
     int i, j;
     for ( i = 0; i < row; i++) {
         for (j = 0; j < col; j++) {
             if (is_result) {
-                mat[i][j] = 0;
+                mat[i*col + j] = 0;
             } else {
-                mat[i][j] = rand() % (row*col);
+                mat[i*col + j] = rand() % (row*col);
             } 
         }
     }
    return; 
 }
 
-void display_matrix(int row, int col, int (*mat)[col])
+void display_matrix(int row, int col, double mat[])
 {
     printf("\n");
     int i, j;
     for ( i = 0; i < row; i++) {
         for (j = 0; j < col; j++) {
-            printf("%d\t", mat[2][1]);
+            printf("%lf\t", mat[i*col + j]);
         }
         printf("\n");
     }
    return; 
 }
 
-void multiply_cblas(int r1, int c1, double (*first)[c1], int r2, int c2, double (*second)[c2], double (*result)[c2])
+void multiply_cblas(int r1, int c1, double first[], int r2, int c2, double second[], double result[])
 {
     double alpha, beta;
     alpha = 1.0; beta = 0.0;
-    cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, r1, c2, c1, alpha, &first[0][0], c1, &second[0][0], c2, beta, &result[0][0], c2);
+    cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, r1, c2, c1, alpha, first, c1, second, c2, beta, result, c2);
 }
 
-void multiply_block(int r1, int c1, double (*first)[c1], int r2, int c2, double (*second)[c2], double (*result)[c2])
+void multiply_block(int r1, int c1, double first[], int r2, int c2, double second[], double result[])
 {
     int ii, jj, kk, i, j, k, blk_size = BLOCK_SIZE;
 
@@ -52,7 +52,7 @@ void multiply_block(int r1, int c1, double (*first)[c1], int r2, int c2, double 
 				for(i = ii; i < min(r1, ii+blk_size); i++) {
                     for(k = kk; k < min(c1, kk+blk_size); k++) {
                         for(j = jj; j < min(c2, jj+blk_size); j++) {
-							result[i][j] += first[i][k] * second[k][j]; 
+							result[i*c2 + j] += first[i*c1 + k] * second[k*c2 + j]; 
                         }
                     }
                 }
@@ -61,7 +61,7 @@ void multiply_block(int r1, int c1, double (*first)[c1], int r2, int c2, double 
     }											
 }
 
-void multiply_block_reuse(int r1, int c1, double (*first)[c1], int r2, int c2, double (*second)[c2], double (*result)[c2])
+void multiply_block_reuse(int r1, int c1, double first[], int r2, int c2, double second[], double result[])
 {
     int ii, jj, kk, i, j, k, first_ik, blk_size = BLOCK_SIZE;
 
@@ -70,9 +70,9 @@ void multiply_block_reuse(int r1, int c1, double (*first)[c1], int r2, int c2, d
             for(jj = 0; jj < c2; jj += blk_size) {
 				for(i = ii; i < min(r1, ii+blk_size); i++) {
                     for(k = kk; k < min(c1, kk+blk_size); k++) {
-                        first_ik = first[i][k];
+                        first_ik = first[i*c1 + k];
                         for(j = jj; j < min(c2, jj+blk_size); j++) {
-							result[i][j] += first_ik * second[k][j]; 
+							result[i*c2 + j] += first_ik * second[k*c2 + j]; 
                         }
                     }
                 }
@@ -81,7 +81,7 @@ void multiply_block_reuse(int r1, int c1, double (*first)[c1], int r2, int c2, d
     }											
 }
 
-void multiply_block_unroll_reuse(int r1, int c1, double (*first)[c1], int r2, int c2, double (*second)[c2], double (*result)[c2])
+void multiply_block_unroll_reuse(int r1, int c1, double first[], int r2, int c2, double second[], double result[])
 {
     int ii, jj, kk, i, j, k, first_ik, blk_size = BLOCK_SIZE;
 
@@ -90,23 +90,23 @@ void multiply_block_unroll_reuse(int r1, int c1, double (*first)[c1], int r2, in
             for(jj = 0; jj < c2; jj += blk_size) {
 				for(i = ii; i < min(r1, ii+blk_size); i++) {
                     for(k = kk; k < min(c1, kk+blk_size); k++) {
-                        first_ik = first[i][k];
+                        first_ik = first[i*c1 + k];
                         for(j = jj; j < min(c2, jj+blk_size); j+=8) {
 							if (min(c2, jj+blk_size) - j >= 8) 
                             {
-                                result[i][j+0] += first_ik * second[k][j+0];
-                                result[i][j+1] += first_ik * second[k][j+1];
-                                result[i][j+2] += first_ik * second[k][j+2];
-                                result[i][j+3] += first_ik * second[k][j+3];
-                                result[i][j+4] += first_ik * second[k][j+4];
-                                result[i][j+5] += first_ik * second[k][j+5];
-                                result[i][j+6] += first_ik * second[k][j+6];
-                                result[i][j+7] += first_ik * second[k][j+7];
+                                result[i*c2 + j + 0] += first_ik * second[k*c2 + j + 0];
+                                result[i*c2 + j + 1] += first_ik * second[k*c2 + j + 1];
+                                result[i*c2 + j + 2] += first_ik * second[k*c2 + j + 2];
+                                result[i*c2 + j + 3] += first_ik * second[k*c2 + j + 3];
+                                result[i*c2 + j + 4] += first_ik * second[k*c2 + j + 4];
+                                result[i*c2 + j + 5] += first_ik * second[k*c2 + j + 5];
+                                result[i*c2 + j + 6] += first_ik * second[k*c2 + j + 6];
+                                result[i*c2 + j + 7] += first_ik * second[k*c2 + j + 7];
                             }
                             else
                             {
                                 for (; j<min(c2, jj+blk_size); j++) {
-                                    result[i][j] += first_ik * second[k][j];
+                                    result[i*c2 + j] += first_ik * second[k*c2 + j];
                                 }
                             }
                         }
@@ -117,26 +117,26 @@ void multiply_block_unroll_reuse(int r1, int c1, double (*first)[c1], int r2, in
     }											
 }
 
-void multiply_unroll(int r1, int c1, double (*first)[c1], int r2, int c2, double (*second)[c2], double (*result)[c2])
+void multiply_unroll(int r1, int c1, double first[], int r2, int c2, double second[], double result[])
 {
     for (int i = 0; i < r1; ++i) {
         for (int k = 0; k < c1; ++k) {
             for (int j = 0; j < c2; j+=8) {
                 if (c2 - j >= 8) 
                 {
-                    result[i][j+0] += first[i][k] * second[k][j+0];
-                    result[i][j+1] += first[i][k] * second[k][j+1];
-                    result[i][j+2] += first[i][k] * second[k][j+2];
-                    result[i][j+3] += first[i][k] * second[k][j+3];
-                    result[i][j+4] += first[i][k] * second[k][j+4];
-                    result[i][j+5] += first[i][k] * second[k][j+5];
-                    result[i][j+6] += first[i][k] * second[k][j+6];
-                    result[i][j+7] += first[i][k] * second[k][j+7];
+                    result[i*c2 + j + 0] += first[i*c1 + k] * second[k*c2 + j + 0];
+                    result[i*c2 + j + 1] += first[i*c1 + k] * second[k*c2 + j + 1];
+                    result[i*c2 + j + 2] += first[i*c1 + k] * second[k*c2 + j + 2];
+                    result[i*c2 + j + 3] += first[i*c1 + k] * second[k*c2 + j + 3];
+                    result[i*c2 + j + 4] += first[i*c1 + k] * second[k*c2 + j + 4];
+                    result[i*c2 + j + 5] += first[i*c1 + k] * second[k*c2 + j + 5];
+                    result[i*c2 + j + 6] += first[i*c1 + k] * second[k*c2 + j + 6];
+                    result[i*c2 + j + 7] += first[i*c1 + k] * second[k*c2 + j + 7];
                 }
                 else
                 {
                     for (; j<c2; j++) {
-                        result[i][j] += first[i][k] * second[k][j];
+                        result[i*c2 + j] += first[i*c1 + k] * second[k*c2 + j];
                     }
                 }
             }
@@ -144,28 +144,28 @@ void multiply_unroll(int r1, int c1, double (*first)[c1], int r2, int c2, double
     }
 }
 
-void multiply_unroll_reuse(int r1, int c1, double (*first)[c1], int r2, int c2, double (*second)[c2], double (*result)[c2])
+void multiply_unroll_reuse(int r1, int c1, double first[], int r2, int c2, double second[], double result[])
 {
     int first_ik;
     for (int i = 0; i < r1; ++i) {
         for (int k = 0; k < c1; ++k) {
-            first_ik = first[i][k];
+            first_ik = first[i*c1 + k];
             for (int j = 0; j < c2; j+=8) {
                 if (c2 - j >= 8) 
                 {
-                    result[i][j+0] += first_ik * second[k][j+0];
-                    result[i][j+1] += first_ik * second[k][j+1];
-                    result[i][j+2] += first_ik * second[k][j+2];
-                    result[i][j+3] += first_ik * second[k][j+3];
-                    result[i][j+4] += first_ik * second[k][j+4];
-                    result[i][j+5] += first_ik * second[k][j+5];
-                    result[i][j+6] += first_ik * second[k][j+6];
-                    result[i][j+7] += first_ik * second[k][j+7];
+                    result[i*c2 + j + 0] += first_ik * second[k*c2 + j + 0];
+                    result[i*c2 + j + 1] += first_ik * second[k*c2 + j + 1];
+                    result[i*c2 + j + 2] += first_ik * second[k*c2 + j + 2];
+                    result[i*c2 + j + 3] += first_ik * second[k*c2 + j + 3];
+                    result[i*c2 + j + 4] += first_ik * second[k*c2 + j + 4];
+                    result[i*c2 + j + 5] += first_ik * second[k*c2 + j + 5];
+                    result[i*c2 + j + 6] += first_ik * second[k*c2 + j + 6];
+                    result[i*c2 + j + 7] += first_ik * second[k*c2 + j + 7];
                 }
                 else
                 {
                     for (; j<c2; j++) {
-                        result[i][j] += first[i][k] * second[k][j];
+                        result[i*c2 + j] += first_ik * second[k*c2 + j];
                     }
                 }
             }
@@ -173,45 +173,50 @@ void multiply_unroll_reuse(int r1, int c1, double (*first)[c1], int r2, int c2, 
     }
 }
 
-void multiply_reorder_reuse(int r1, int c1, double (*first)[c1], int r2, int c2, double (*second)[c2], double (*result)[c2])
+void multiply_reorder_reuse(int r1, int c1, double first[], int r2, int c2, double second[], double result[])
 {
     int first_ik;
     for (int i = 0; i < r1; ++i) {
         for (int k = 0; k < c1; ++k) {
-            first_ik = first[i][k];
+            first_ik = first[i*c1 + k];
             for (int j = 0; j < c2; ++j) {
-                result[i][j] += first_ik * second[k][j];
+                result[i*c2 + j] += first_ik * second[k*c2 + j];
             }
         }
     }
 }
 
-void multiply_naive(int r1, int c1, double (*first)[c1], int r2, int c2, double (*second)[c2], double (*result)[c2])
+void multiply_naive(int r1, int c1, double first[], int r2, int c2, double second[], double result[])
 {
     for (int i = 0; i < r1; ++i) {        
         for (int j = 0; j < c2; ++j) {
             for (int k = 0; k < c1; ++k) {
-                result[i][j] += first[i][k] * second[k][j];
+                result[i*c2 + j] += first[i*c1 + k] * second[k*c2 + j];
             }
         }
     }
 }
 
-int compare_matrix(int r1, int c1, double (*first)[c1], int r2, int c2, double (*second)[c2])
+int compare_matrix(int r1, int c1, double first[], int r2, int c2, double second[])
 {
     for (int i = 0; i < r1; ++i)
         for (int j = 0; j < c2; ++j) 
-            if (first[i][j] != second[i][j])
+            if (first[i*c2 + j] != second[i*c2 + j])
                 return -1;
     return 0;
 }
 
 int main()
 {
-    int dim = 500;
+    int dim = 1023;
     static struct timeval str, end;
     unsigned long long time;
-    double A[dim][dim], B[dim][dim], C[dim][dim], Baseline[dim][dim];
+    // double A[dim][dim], B[dim][dim], C[dim][dim], Baseline[dim][dim];
+    double* A = malloc((dim * dim) * sizeof(double));
+    double* B = malloc((dim * dim) * sizeof(double));
+    double* C = malloc((dim * dim) * sizeof(double));
+    double* Baseline = malloc((dim * dim) * sizeof(double));
+
     initialize_matrix(dim, dim, A, 0);
     initialize_matrix(dim, dim, B, 0);
     initialize_matrix(dim, dim, C, 1);
