@@ -1,0 +1,3 @@
+make
+./matmul
+make clean
