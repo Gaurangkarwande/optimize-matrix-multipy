@@ -225,7 +225,7 @@ int main()
     multiply_naive(dim, dim, A, dim, dim, B, Baseline);
 
     gettimeofday(&str, NULL);
-    multiply_block_unroll_reuse(dim, dim, A, dim, dim, B, C);
+    multiply_cblas(dim, dim, A, dim, dim, B, C);
     gettimeofday(&end, NULL);
 
     if (compare_matrix(dim, dim, Baseline, dim, dim, C) == -1)
